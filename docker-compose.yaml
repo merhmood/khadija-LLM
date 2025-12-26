@@ -11,29 +11,6 @@ networks:
 
 services:
   ################################
-  # Text Generation Inference (distilgpt2)
-  ################################
-  tgi:
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    container_name: tgi
-    command: >
-      --model-id distilgpt2
-      --dtype float16
-      --max-input-length 256
-      --max-total-tokens 512
-      --max-batch-prefill-tokens 256
-      --max-concurrent-requests 1
-    volumes:
-      - hf_cache:/data
-    shm_size: "256mb"
-    deploy:
-      resources:
-        limits:
-          memory: 700m
-    networks:
-      - app_net
-
-  ################################
   # Gradio App
   ################################
   gradio:
@@ -61,7 +38,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
+      - ./certbot_www:/var/www/certbot
     networks:
       - app_net
 

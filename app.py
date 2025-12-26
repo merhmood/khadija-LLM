@@ -3,10 +3,9 @@ from pathlib import Path
 import fitz  # PyMuPDF
 import faiss
 import numpy as np
-import gradio as gr
-
 from sentence_transformers import SentenceTransformer
-from huggingface_hub import InferenceClient
+from openai import OpenAI
+import gradio as gr
 
 # =========================
 # Config
@@ -14,11 +13,15 @@ from huggingface_hub import InferenceClient
 PDF_DIR = "./company_docs"
 INDEX_PATH = "./data/faiss.index"
 TOP_K = 4
+HF_TOKEN = os.getenv("HF_TOKEN")  # Set as environment variable in production
+MODEL_ID = "CohereLabs/command-a-reasoning-08-2025:cohere"
 
 SYSTEM_PROMPT = """
-You are a helpful company assistant.
+You are a Yobe Trust Fund company assistant.
+During greetings or salutations, introduce yourself as the Yobe Trust Fund company assistant.
 Answer ONLY using the provided company documents.
-If the answer is not found in the documents, say you don’t know.
+If the answer is not found in the documents, say you don’t know in a polite manner.
+If the user question is too vague, ask them to clarify.
 Be concise and factual.
 """
 
@@ -41,14 +44,12 @@ def load_pdfs(pdf_dir):
         for page_num, page in enumerate(doc, start=1):
             text = page.get_text()
             page_chunks = chunk_text(text)
-
             for chunk in page_chunks:
                 chunks.append(chunk)
                 metadata.append({
                     "file": pdf.name,
                     "page": page_num
                 })
-
     return chunks, metadata
 
 print("📄 Loading PDFs...")
@@ -80,69 +81,57 @@ def retrieve_context(query, top_k=TOP_K):
     _, indices = index.search(q_vec, top_k)
 
     context = []
-    citations = set()
-
     for i in indices[0]:
-        context.append(chunks[i])
-        m = metadatas[i]
-        citations.add(f"{m['file']} (page {m['page']})")
+        # Avoid duplicates
+        if chunks[i] not in context:
+            context.append(f"[Doc: {metadatas[i]['file']}, Page: {metadatas[i]['page']}]\n{chunks[i]}")
+    return "\n\n".join(context)
 
-    return "\n\n".join(context), "\n".join(sorted(citations))
 
 # =========================
-# TGI Client
+# HuggingFace OpenAI-compatible client
 # =========================
-client = InferenceClient(
-    model="http://tgi:80"  # Docker service name
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=HF_TOKEN,
 )
 
 # =========================
-# Streaming Chat
+# Chat function
 # =========================
-def stream_chat(user_input):
-    context, citations = retrieve_context(user_input)
+def chat_fn(message, history=None):
+    # history is managed by Gradio, can be ignored internally if you want
+    context = retrieve_context(message)
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "system", "content": f"Company documents:\n{context}"},
-        {"role": "user", "content": user_input},
+        {"role": "system", "content": f"Company documents:\n{context}"}
     ]
 
-    stream = client.chat_completion(
-        messages=messages,
-        max_tokens=250,
-        temperature=0.3,
-        stream=True,
+    # If you want to include previous messages
+    if history:
+        messages += history
+
+    messages.append({"role": "user", "content": message})
+
+    completion = client.chat.completions.create(
+        model=MODEL_ID,
+        messages=messages
     )
 
-    partial = ""
-    for chunk in stream:
-        delta = chunk.choices[0].delta.get("content", "")
-        partial += delta
-        yield partial
+    answer = completion.choices[0].message.content
 
-    yield f"{partial}\n\n📚 Sources:\n{citations}"
+    # Gradio handles the history, so just return the answer string
+    return answer
 
 # =========================
-# Gradio UI (Streaming)
+# Launch Gradio ChatInterface
 # =========================
-with gr.Blocks(title="Company PDF Assistant") as demo:
-    gr.Markdown("## 📄 Company Knowledge Assistant")
-
-    chatbot = gr.Chatbot()
-    msg = gr.Textbox(
-        placeholder="Ask a question about company documents…",
-        scale=7
-    )
-    clear = gr.Button("Clear Chat")
-
-    def respond(message, history):
-        history.append((message, ""))
-        for partial in stream_chat(message):
-            history[-1] = (message, partial)
-            yield history
-
-    msg.submit(respond, [msg, chatbot], chatbot)
-    clear.click(lambda: [], None, chatbot)
+demo = gr.ChatInterface(
+    fn=chat_fn,
+    title="Yobe Trust Fund Company Assistant",
+    description="Ask questions about our company.",
+    save_history=True
+)
 
 demo.launch(server_name="0.0.0.0", server_port=7860)
