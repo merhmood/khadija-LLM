@@ -14,7 +14,7 @@ services:
     container_name: tgi
     command: >
       --model-id HuggingFaceTB/SmolLM2-135M-Instruct
-      --dtype float32
+      --dtype float16
     volumes:
       - hf_cache:/data
     shm_size: "512mb"
