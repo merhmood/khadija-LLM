@@ -22,7 +22,9 @@ services:
       - app_net
 
   gradio:
-    image: rag-gradio:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: gradio
     expose:
       - "7860"
