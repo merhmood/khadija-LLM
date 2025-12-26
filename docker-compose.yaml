@@ -1,0 +1,60 @@
+version: "3.9"
+
+volumes:
+  hf_cache:
+  certbot_conf:
+  certbot_www:
+
+networks:
+  app_net:
+
+services:
+  tgi:
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    container_name: tgi
+    command: >
+      --model-id HuggingFaceTB/SmolLM2-135M-Instruct
+      --dtype float32
+    volumes:
+      - hf_cache:/data
+    shm_size: "512mb"
+    networks:
+      - app_net
+
+  gradio:
+    image: rag-gradio:latest
+    container_name: gradio
+    expose:
+      - "7860"
+    volumes:
+      - ./company_docs:/app/company_docs
+      - ./data:/app/data
+    depends_on:
+      - tgi
+    networks:
+      - app_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    depends_on:
+      - gradio
+    networks:
+      - app_net
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    networks:
+      - app_net

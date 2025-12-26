@@ -1,0 +1,69 @@
+# =========================
+# OS / Editor files
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.env
+.venv/
+venv/
+ENV/
+
+# =========================
+# Gradio / App data
+# =========================
+data/
+uploads/
+logs/
+
+# =========================
+# HuggingFace cache
+# =========================
+.cache/
+hf_cache/
+**/.huggingface/
+
+# =========================
+# Docker
+# =========================
+*.log
+docker-compose.override.yml
+
+# =========================
+# Certbot / SSL (DO NOT COMMIT CERTS)
+# =========================
+certbot/conf/
+certbot/www/
+
+# =========================
+# Nginx runtime
+# =========================
+nginx/logs/
+nginx/*.pid
+
+# =========================
+# Terraform (future-proof)
+# =========================
+*.tfstate
+*.tfstate.*
+infra/.terraform/
+infra/.terraform.lock.hcl
+
+# =========================
+# Secrets
+# =========================
+*.key
+*.pem
+*.crt
+secrets/
